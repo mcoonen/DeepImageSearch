@@ -205,7 +205,7 @@ class Search_Setup:
         self.n = n
         index = faiss.read_index(config.image_features_vectors_idx(self.model_name))
         D, I = index.search(np.array([self.v], dtype=np.float32), self.n)
-        return dict(zip(I[0], self.image_data.iloc[I[0]]['images_paths'].to_list()))
+        return [{"image_path": self.image_data.iloc[idx]['images_paths'], "score": 1 - dist} for idx, dist in zip(I[0], D[0])]
 
     def _get_query_vector(self, image_path: str):
         self.image_path = image_path
@@ -233,7 +233,7 @@ class Search_Setup:
         plt.show()
 
         query_vector = self._get_query_vector(image_path)
-        img_list = list(self._search_by_vector(query_vector, number_of_images).values())
+        img_list = self._search_by_vector(query_vector, number_of_images)
 
         grid_size = math.ceil(math.sqrt(number_of_images))
         axes = []
@@ -241,17 +241,17 @@ class Search_Setup:
         for a in range(number_of_images):
             axes.append(fig.add_subplot(grid_size, grid_size, a + 1))
             plt.axis('off')
-            img = Image.open(img_list[a])
+            img = Image.open(img_list[a]['image_path'])
             img_resized = ImageOps.fit(img, (224, 224), Image.LANCZOS)
             plt.imshow(img_resized)
         fig.tight_layout()
         fig.subplots_adjust(top=0.93)
         fig.suptitle('Similar Result Found', fontsize=22)
-        plt.show(fig)
+        fig.show()
 
     def get_similar_images(self, image_path: str, number_of_images: int = 10):
         """
-        Returns the most similar images to a given query image according to the indexed image features.
+        Returns the most similar images to a given query image along with their similarity scores.
 
         Parameters:
         -----------
@@ -263,8 +263,9 @@ class Search_Setup:
         self.image_path = image_path
         self.number_of_images = number_of_images
         query_vector = self._get_query_vector(self.image_path)
-        img_dict = self._search_by_vector(query_vector, self.number_of_images)
-        return img_dict
+        results = self._search_by_vector(query_vector, self.number_of_images)
+        return results
+
     def get_image_metadata_file(self):
         """
         Returns the metadata file containing information about the indexed images.
